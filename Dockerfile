@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
@@ -15,11 +15,13 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
-COPY main.py .
 COPY biencoder_model ./biencoder_model
 COPY index_data ./index_data
 COPY price_lists ./price_lists
+
+COPY app ./app
+COPY main.py .
+
 
 RUN mkdir -p /data/index_data /data/price_lists \
     && useradd --system --create-home --uid 10001 appuser \

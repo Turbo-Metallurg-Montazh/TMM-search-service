@@ -15,6 +15,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Cache Git LFS artifacts
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('biencoder_model/model.safetensors', 'index_data/embeddings.pt') }}
+          restore-keys: |
+            lfs-
 
       - name: Pull runtime LFS artifacts
         run: |
@@ -36,6 +46,8 @@ jobs:
           tags: |
             ghcr.io/turbo-metallurg-montazh/tmm-search-service:${{ github.sha }}
             ghcr.io/turbo-metallurg-montazh/tmm-search-service:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy to k3s
         run: |
@@ -43,4 +55,4 @@ jobs:
           kubectl --kubeconfig=kubeconfig apply -f k8s/
           kubectl --kubeconfig=kubeconfig set image deployment/emk-search-service \
             search-service=ghcr.io/turbo-metallurg-montazh/tmm-search-service:${{ github.sha }} \
-            -n backend
+            -n search-service
