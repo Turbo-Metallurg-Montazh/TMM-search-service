@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: emk-search-service
-  namespace: backend
+  namespace: search-service
 spec:
   selector:
     app: emk-search-service

@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: emk-search-service
-  namespace: backend
+  namespace: search-service
 spec:
   rules:
     - host: search.turbo-metallurg-montazh.ru
