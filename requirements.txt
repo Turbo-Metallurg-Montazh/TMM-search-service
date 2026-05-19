@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pandas
+openpyxl
+scikit-learn
+torch
+transformers
+tqdm
+pydantic
+prometheus_client
+rapidfuzz
+textdistance
+numpy
+python-multipart
+xlrd
