@@ -55,7 +55,7 @@ jobs:
       - name: Deploy to k3s
         run: |
           echo "${{ secrets.K3S_KUBECONFIG }}" > kubeconfig
-          kubectl --kubeconfig=kubeconfig apply -f k8s/
+          kubectl --kubeconfig=kubeconfig apply -f k8s/ -R
           kubectl --kubeconfig=kubeconfig set image deployment/emk-search-service \
             search-service=ghcr.io/turbo-metallurg-montazh/tmm-search-service:${{ github.sha }} \
             -n search-service
