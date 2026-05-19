@@ -10,6 +10,7 @@ from starlette.responses import Response
 
 import app.state as state
 from app.catalogs import list_catalog_files, save_catalog_upload
+from app.config import ALLOWED_HOSTS, ALLOWED_ORIGINS, ALLOWED_REFERER_ORIGINS, API_PREFIX, origin_from_url
 from app.indexer import build_search_index, load_index_from_disk
 from app.search import find_similar_with_prices
 from app.spreadsheet_io import export_univer_to_xlsx, import_xlsx_to_univer
@@ -40,11 +41,46 @@ app = FastAPI(title="EMK Search Service", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def strip_api_prefix_mw(request, call_next):
+    if API_PREFIX and request.scope["path"].startswith(f"{API_PREFIX}/"):
+        request.scope["root_path"] = API_PREFIX
+        request.scope["path"] = request.scope["path"][len(API_PREFIX) :]
+    elif API_PREFIX and request.scope["path"] == API_PREFIX:
+        request.scope["root_path"] = API_PREFIX
+        request.scope["path"] = "/"
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def origin_guard_mw(request, call_next):
+    health_paths = {"/health"}
+    if API_PREFIX:
+        health_paths.add(f"{API_PREFIX}/health")
+    if request.scope["path"] in health_paths:
+        return await call_next(request)
+
+    host = request.headers.get("host", "").split(":", 1)[0].lower()
+    if ALLOWED_HOSTS and host and host not in {allowed.lower() for allowed in ALLOWED_HOSTS}:
+        return Response("Forbidden host", status_code=403)
+
+    origin = request.headers.get("origin")
+    if origin and origin.rstrip("/") not in ALLOWED_ORIGINS:
+        return Response("Forbidden origin", status_code=403)
+
+    referer = request.headers.get("referer")
+    referer_origin = origin_from_url(referer) if referer else None
+    if referer_origin and referer_origin not in ALLOWED_REFERER_ORIGINS:
+        return Response("Forbidden referer", status_code=403)
+
+    return await call_next(request)
 
 
 @app.middleware("http")

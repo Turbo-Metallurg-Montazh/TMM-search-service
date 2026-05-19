@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: emk-search-service
+  namespace: backend
+spec:
+  rules:
+    - host: search.turbo-metallurg-montazh.ru
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: emk-search-service
+                port:
+                  number: 80

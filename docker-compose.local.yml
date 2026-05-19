@@ -1,0 +1,26 @@
+services:
+  search-service:
+    build:
+      context: .
+    container_name: emk-search-service-local
+    restart: unless-stopped
+    environment:
+      MODEL_DIR: /app/biencoder_model
+      INDEX_DIR: /data/index_data
+      PRICE_LIST_DIR: /data/price_lists
+    ports:
+      - "8000:8000"
+    volumes:
+      - search_index_data:/data/index_data
+      - search_price_lists:/data/price_lists
+    command:
+      - sh
+      - -c
+      - |
+        if [ ! -f /data/index_data/embeddings.pt ]; then cp -a /app/index_data/. /data/index_data/; fi
+        if [ -z "$$(find /data/price_lists -maxdepth 1 -type f -name '*.xls*' -print -quit)" ]; then cp -a /app/price_lists/. /data/price_lists/; fi
+        exec uvicorn main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  search_index_data:
+  search_price_lists:

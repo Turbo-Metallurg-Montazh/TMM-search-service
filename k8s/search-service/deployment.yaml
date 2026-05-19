@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emk-search-service
+  namespace: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emk-search-service
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: emk-search-service
+    spec:
+      securityContext:
+        fsGroup: 10001
+      initContainers:
+        - name: seed-search-data
+          image: ghcr.io/turbo-metallurg-montazh/tmm-search-service:latest
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /data/index_data /data/price_lists
+              if [ ! -f /data/index_data/embeddings.pt ]; then
+                cp -a /app/index_data/. /data/index_data/
+              fi
+              if [ -z "$(find /data/price_lists -maxdepth 1 -type f -name '*.xls*' -print -quit)" ]; then
+                cp -a /app/price_lists/. /data/price_lists/
+              fi
+          volumeMounts:
+            - name: search-data
+              mountPath: /data
+      containers:
+        - name: search-service
+          image: ghcr.io/turbo-metallurg-montazh/tmm-search-service:latest
+          imagePullPolicy: Always
+          env:
+            - name: MODEL_DIR
+              value: /app/biencoder_model
+            - name: INDEX_DIR
+              value: /data/index_data
+            - name: PRICE_LIST_DIR
+              value: /data/price_lists
+            - name: DEFAULT_BATCH_SIZE
+              value: "16"
+            - name: ALLOWED_ORIGINS
+              value: https://search.turbo-metallurg-montazh.ru
+            - name: ALLOWED_HOSTS
+              value: search.turbo-metallurg-montazh.ru,emk-search-service,emk-search-service.backend.svc,emk-search-service.backend.svc.cluster.local
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "6Gi"
+          volumeMounts:
+            - name: search-data
+              mountPath: /data
+      volumes:
+        - name: search-data
+          persistentVolumeClaim:
+            claimName: emk-search-service-data
