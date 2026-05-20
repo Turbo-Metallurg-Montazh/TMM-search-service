@@ -60,6 +60,8 @@ Compose использует volumes для `/data/index_data` и `/data/price_l
 
 ## API
 
+Swagger/OpenAPI-описание всех endpoint'ов лежит в `docs/swagger.yaml`.
+
 Поиск:
 
 - `POST /suggest` - вернуть варианты совпадений для строки тендерной документации
