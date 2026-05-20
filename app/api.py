@@ -1,6 +1,5 @@
 import time
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,11 +19,13 @@ REQ = Counter("http_requests_total", "Total HTTP requests", ["method", "path", "
 LAT = Histogram("http_request_duration_seconds", "Request latency", ["path"])
 
 
-class SuggestRequest(BaseModel):
-    row: list[Any]
-    rowIndex: int
-    colIndex: int
-    topK: int = Field(default=7, ge=1, le=50)
+class Suggestion(BaseModel):
+    name: str
+    price: float | None = None
+    similarity: float
+    source_file: str | None = None
+    sheet: str | None = None
+    row: int | None = None
 
 
 class BuildIndexRequest(BaseModel):
@@ -124,30 +125,27 @@ def index_status():
     }
 
 
-@app.post("/suggest")
-def suggest(req: SuggestRequest):
+@app.post("/suggest", response_model=list[Suggestion])
+def suggest(query: str = Body(..., min_length=1, description="Tender item text to match against supplier catalogs")):
     if not state.INDEX_READY:
         raise HTTPException(status_code=503, detail="Index not built")
 
-    query = str(req.row[0]).strip() if req.row else ""
+    query = query.strip()
     if not query:
-        return {"options": []}
+        return []
 
-    matches = find_similar_with_prices(query, top_k=req.topK)
-    return {
-        "options": [
-            {
-                "label": f"{m['name']} — {m['price']}",
-                "a": m["name"],
-                "b": m["price"],
-                "score": m["score"],
-                "source_file": m.get("source_file"),
-                "sheet": m.get("sheet"),
-                "row": m.get("row"),
-            }
-            for m in matches
-        ]
-    }
+    matches = find_similar_with_prices(query, top_k=3)
+    return [
+        Suggestion(
+            name=m["name"],
+            price=m["price"],
+            similarity=m["score"],
+            source_file=m.get("source_file"),
+            sheet=m.get("sheet"),
+            row=m.get("row"),
+        )
+        for m in matches
+    ]
 
 
 @app.get("/catalogs")

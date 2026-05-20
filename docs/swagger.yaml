@@ -65,14 +65,21 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SuggestRequest'
+              type: string
+              minLength: 1
+              title: Query
+              description: Tender item text to match against supplier catalogs
         required: true
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                items:
+                  $ref: '#/components/schemas/Suggestion'
+                type: array
+                title: Response Suggest Suggest Post
         '422':
           description: Validation Error
           content:
@@ -266,30 +273,39 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
-    SuggestRequest:
+    Suggestion:
       properties:
+        name:
+          type: string
+          title: Name
+        price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Price
+        similarity:
+          type: number
+          title: Similarity
+        source_file:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source File
+        sheet:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sheet
         row:
-          items: {}
-          type: array
+          anyOf:
+          - type: integer
+          - type: 'null'
           title: Row
-        rowIndex:
-          type: integer
-          title: Rowindex
-        colIndex:
-          type: integer
-          title: Colindex
-        topK:
-          type: integer
-          maximum: 50.0
-          minimum: 1.0
-          title: Topk
-          default: 7
       type: object
       required:
-      - row
-      - rowIndex
-      - colIndex
-      title: SuggestRequest
+      - name
+      - similarity
+      title: Suggestion
     ValidationError:
       properties:
         loc:

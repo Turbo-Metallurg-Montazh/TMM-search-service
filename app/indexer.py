@@ -55,7 +55,7 @@ def load_index_from_disk() -> bool:
     if not (emb_path.exists() and names_path.exists() and prices_path.exists()):
         return False
 
-    state.EMB = torch.load(emb_path, map_location="cpu")
+    state.EMB = torch.load(emb_path, map_location="cpu", weights_only=False)
     state.EMB_T = state.EMB.t()
     state.CANDIDATE_NAMES = json.loads(names_path.read_text(encoding="utf-8"))
     state.CANDIDATE_PRICES = json.loads(prices_path.read_text(encoding="utf-8"))

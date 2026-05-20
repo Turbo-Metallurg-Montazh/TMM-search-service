@@ -64,7 +64,7 @@ Swagger/OpenAPI-описание всех endpoint'ов лежит в `docs/swag
 
 Поиск:
 
-- `POST /suggest` - вернуть варианты совпадений для строки тендерной документации
+- `POST /suggest` - принять строку тендерной позиции и вернуть топ-3 совпадения из каталогов с метрикой похожести `similarity`
 - `POST /build-index` - пересобрать индекс по текущим каталогам
 - `GET /index-status` - состояние индекса и количество каталогов
 
@@ -85,6 +85,14 @@ Excel:
 
 ```bash
 curl -F "file=@catalog.xlsx" "http://localhost:8000/catalogs/upload?rebuild_index=true"
+```
+
+Пример поиска:
+
+```bash
+curl -X POST "http://localhost:8000/suggest" \
+  -H "Content-Type: application/json" \
+  -d '"Автоматический выключатель 16А"'
 ```
 
 ## Kubernetes
