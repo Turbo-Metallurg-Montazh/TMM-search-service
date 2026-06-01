@@ -4,6 +4,10 @@ metadata:
   name: emk-search-service
   namespace: search-service
 spec:
+  tls:
+    - hosts:
+        - search.turbo-metallurg-montazh.ru
+      secretName: cloudflare-origin-cert
   rules:
     - host: search.turbo-metallurg-montazh.ru
       http:
