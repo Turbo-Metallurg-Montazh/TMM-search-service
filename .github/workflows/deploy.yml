@@ -18,18 +18,27 @@ jobs:
         with:
           lfs: false
 
-      - name: Cache Git LFS artifacts
-        uses: actions/cache@v4
+      - name: Restore Git LFS artifacts
+        uses: actions/cache/restore@v4
         with:
           path: .git/lfs
-          key: lfs-${{ hashFiles('biencoder_model/model.safetensors', 'index_data/embeddings.pt') }}
-          restore-keys: |
-            lfs-
+          key: lfs-v2-${{ hashFiles('biencoder_model/model.safetensors', 'index_data/embeddings.pt') }}
 
       - name: Pull runtime LFS artifacts
         run: |
           git lfs install
           git lfs pull --include="biencoder_model/model.safetensors,index_data/embeddings.pt"
+
+      - name: Save Git LFS artifacts
+        uses: actions/cache/save@v4
+        with:
+          path: .git/lfs
+          key: lfs-v2-${{ hashFiles('biencoder_model/model.safetensors', 'index_data/embeddings.pt') }}
+
+      - name: Reclaim duplicated Git LFS disk space
+        run: |
+          rm -rf .git/lfs/objects
+          df -h /
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -50,7 +59,7 @@ jobs:
             ghcr.io/turbo-metallurg-montazh/tmm-search-service:${{ github.sha }}
             ghcr.io/turbo-metallurg-montazh/tmm-search-service:latest
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
 
       - name: Deploy to k3s
         run: |
