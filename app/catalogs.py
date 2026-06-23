@@ -26,6 +26,8 @@ def parse_price(value: Any) -> float | None:
     if not text:
         return None
 
+    text = re.sub(r"[.,]+$", "", text)
+
     if "," in text and "." in text:
         if text.rfind(",") > text.rfind("."):
             text = text.replace(".", "").replace(",", ".")
