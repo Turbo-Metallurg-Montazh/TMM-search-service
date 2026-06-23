@@ -13,3 +13,6 @@ textdistance
 numpy
 python-multipart
 xlrd
+pytest
+pytest-cov
+httpx
