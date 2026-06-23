@@ -51,6 +51,14 @@ DISABLE_REQUEST_GUARD=true .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 - Metrics: `http://localhost:8000/metrics`
 - Index status: `http://localhost:8000/index-status`
 
+## Тесты
+
+Полный локальный запуск тестов с coverage:
+
+```bash
+.venv/bin/python -m pytest
+```
+
 ## Локально через Docker Compose
 
 ```bash
