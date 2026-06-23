@@ -8,6 +8,7 @@ services:
       MODEL_DIR: /app/biencoder_model
       INDEX_DIR: /data/index_data
       PRICE_LIST_DIR: /data/price_lists
+      DISABLE_REQUEST_GUARD: "true"
     ports:
       - "8000:8000"
     volumes:

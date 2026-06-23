@@ -48,6 +48,16 @@ def test_origin_guard_rejects_forbidden_host(client):
     assert response.text == "Forbidden host"
 
 
+def test_request_guard_can_be_disabled_for_local_clients(monkeypatch, client):
+    monkeypatch.setattr(api, "DISABLE_REQUEST_GUARD", True)
+    monkeypatch.setattr(api, "list_catalog_files", lambda: [])
+
+    response = client.get("/catalogs", headers={"host": "evil.example"})
+
+    assert response.status_code == 200
+    assert response.json() == {"catalogs": []}
+
+
 def test_origin_guard_rejects_forbidden_origin(client):
     response = client.get("/catalogs", headers={"origin": "https://evil.example"})
     assert response.status_code == 403

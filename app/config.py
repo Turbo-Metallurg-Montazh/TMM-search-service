@@ -12,6 +12,7 @@ PRICE_LIST_DIR = Path(os.getenv("PRICE_LIST_DIR", BASE_DIR / "price_lists"))
 MAX_LEN = int(os.getenv("MAX_LEN", "128"))
 DEFAULT_BATCH_SIZE = int(os.getenv("DEFAULT_BATCH_SIZE", "16"))
 API_PREFIX = os.getenv("API_PREFIX", "").rstrip("/")
+DISABLE_REQUEST_GUARD = os.getenv("DISABLE_REQUEST_GUARD", "false").lower() in {"1", "true", "yes", "on"}
 
 
 def _parse_csv(value: str) -> list[str]:

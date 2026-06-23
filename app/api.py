@@ -9,7 +9,14 @@ from starlette.responses import Response
 
 import app.state as state
 from app.catalogs import list_catalog_files, save_catalog_upload
-from app.config import ALLOWED_HOSTS, ALLOWED_ORIGINS, ALLOWED_REFERER_ORIGINS, API_PREFIX, origin_from_url
+from app.config import (
+    ALLOWED_HOSTS,
+    ALLOWED_ORIGINS,
+    ALLOWED_REFERER_ORIGINS,
+    API_PREFIX,
+    DISABLE_REQUEST_GUARD,
+    origin_from_url,
+)
 from app.indexer import build_search_index, load_index_from_disk
 from app.search import find_similar_with_prices
 from app.spreadsheet_io import export_univer_to_xlsx, import_xlsx_to_univer
@@ -62,6 +69,9 @@ async def strip_api_prefix_mw(request, call_next):
 
 @app.middleware("http")
 async def origin_guard_mw(request, call_next):
+    if DISABLE_REQUEST_GUARD:
+        return await call_next(request)
+
     health_paths = {"/health"}
     if API_PREFIX:
         health_paths.add(f"{API_PREFIX}/health")

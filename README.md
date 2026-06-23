@@ -35,13 +35,14 @@ FastAPI-сервис для поиска соответствий между п�
 - `API_PREFIX` - внешний path prefix, по умолчанию пустой
 - `ALLOWED_ORIGINS` - разрешенные browser origins, в k3s выставлен `https://search.turbo-metallurg-montazh.ru`
 - `ALLOWED_HOSTS` - разрешенные Host header для прямых запросов и ingress
+- `DISABLE_REQUEST_GUARD` - отключить проверки `Host`, `Origin` и `Referer`, используется только для локального запуска/Postman
 
 ## Быстрый старт локально
 
 ```bash
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+DISABLE_REQUEST_GUARD=true .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 Проверка:
@@ -57,6 +58,8 @@ docker compose -f docker-compose.local.yml up --build
 ```
 
 Compose использует volumes для `/data/index_data` и `/data/price_lists`. При первом старте они заполняются стартовыми данными из образа.
+
+В `docker-compose.local.yml` включен `DISABLE_REQUEST_GUARD=true`, поэтому локально все endpoint'ы доступны из Postman без ограничений по `Host`, `Origin` и `Referer`.
 
 ## API
 

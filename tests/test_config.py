@@ -1,3 +1,6 @@
+import importlib
+
+import app.config as config
 from app.config import _parse_csv, origin_from_url
 
 
@@ -16,3 +19,13 @@ def test_origin_from_url_returns_scheme_and_host():
 def test_origin_from_url_rejects_invalid_values():
     assert origin_from_url("not-a-url") is None
     assert origin_from_url("//example.com/no-scheme") is None
+
+
+def test_disable_request_guard_env_parsing(monkeypatch):
+    monkeypatch.setenv("DISABLE_REQUEST_GUARD", "true")
+    reloaded = importlib.reload(config)
+
+    assert reloaded.DISABLE_REQUEST_GUARD is True
+
+    monkeypatch.delenv("DISABLE_REQUEST_GUARD")
+    importlib.reload(config)
