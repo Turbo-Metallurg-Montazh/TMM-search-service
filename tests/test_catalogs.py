@@ -27,7 +27,6 @@ def test_parse_price(raw, expected):
     assert catalogs.parse_price(raw) == expected
 
 
-@pytest.mark.xfail(reason="Known bug: trailing punctuation from currency text breaks decimal-comma parsing")
 def test_parse_price_with_currency_text_and_trailing_punctuation():
     assert catalogs.parse_price("1 234,56 руб.") == 1234.56
 
