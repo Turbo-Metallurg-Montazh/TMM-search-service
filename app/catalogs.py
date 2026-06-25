@@ -9,7 +9,7 @@ from fastapi import UploadFile
 from app.config import PRICE_LIST_DIR
 
 
-ALLOWED_CATALOG_SUFFIXES = {".xls", ".xlsx", ".csv"}
+ALLOWED_CATALOG_SUFFIXES = {".xls", ".xlsx"}
 
 
 def parse_price(value: Any) -> float | None:
@@ -49,7 +49,7 @@ def sanitize_catalog_filename(filename: str) -> str:
 
     suffix = Path(name).suffix.lower()
     if suffix not in ALLOWED_CATALOG_SUFFIXES:
-        raise ValueError("Only .xls and .xlsx and .csv catalogs are supported")
+        raise ValueError("Only .xls and .xlsx catalogs are supported")
 
     safe = re.sub(r"[^A-Za-zА-Яа-я0-9._-]", "_", name)
     if safe in {"", ".", ".."}:
@@ -73,7 +73,7 @@ async def save_catalog_upload(file: UploadFile) -> dict[str, Any]:
 def list_catalog_files() -> list[dict[str, Any]]:
     PRICE_LIST_DIR.mkdir(parents=True, exist_ok=True)
     files = []
-    for path in sorted(PRICE_LIST_DIR.glob('*')):
+    for path in sorted(PRICE_LIST_DIR.glob("*.xls*")):
         if path.suffix.lower() not in ALLOWED_CATALOG_SUFFIXES:
             continue
         stat = path.stat()
@@ -83,16 +83,10 @@ def list_catalog_files() -> list[dict[str, Any]]:
 
 def read_catalog_rows(path: Path, name_col: int = 0, price_col: int = 1) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    if path.suffix.lower() == ".csv":
-        sheets = {None: read_csv_file(path)}
-    else:
-        xls = pd.ExcelFile(path)
-        sheets = {}
-        for sheet in xls.sheet_names:
-            df = pd.read_excel(path, sheet_name=sheet, dtype=object)
-            sheets[sheet] = df
+    xls = pd.ExcelFile(path)
 
-    for sheet, df in sheets.items():
+    for sheet in xls.sheet_names:
+        df = pd.read_excel(path, sheet_name=sheet, dtype=object)
         if df.shape[1] <= name_col:
             continue
 
@@ -105,12 +99,7 @@ def read_catalog_rows(path: Path, name_col: int = 0, price_col: int = 1) -> list
             if not product_name or product_name.lower() == "nan":
                 continue
 
-            raw_price = (
-                record.iloc[price_col]
-                if df.shape[1] > price_col
-                else None
-            )
-
+            raw_price = record.iloc[price_col] if df.shape[1] > price_col else None
             rows.append(
                 {
                     "name": product_name,
@@ -128,7 +117,7 @@ def load_price_lists() -> list[dict[str, Any]]:
     PRICE_LIST_DIR.mkdir(parents=True, exist_ok=True)
     catalog_paths = [
         path
-        for path in sorted(PRICE_LIST_DIR.glob("*"))
+        for path in sorted(PRICE_LIST_DIR.glob("*.xls*"))
         if path.suffix.lower() in ALLOWED_CATALOG_SUFFIXES
     ]
     if not catalog_paths:
@@ -155,13 +144,3 @@ def load_price_lists() -> list[dict[str, Any]]:
 
     return rows
 
-def read_csv_file(path: Path) -> pd.DataFrame:
-    separators = [",", ";", "\t"]
-    for sep in separators:
-        try:
-            df = pd.read_csv(path,sep=sep,dtype=object,encoding="utf-8",header=None)
-            if df.shape[1] >= 2:
-                return df
-        except pd.errors.ParserError:
-            continue
-    raise ValueError(f"Unsupported CSV format: {path.name}")
