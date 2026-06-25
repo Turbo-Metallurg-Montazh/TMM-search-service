@@ -146,3 +146,109 @@ def test_save_catalog_upload_rejects_empty_file(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="empty"):
         asyncio.run(catalogs.save_catalog_upload(upload))
+
+
+def test_read_csv_with_comma_separator(tmp_path):
+    path = tmp_path / "catalog.csv"
+    path.write_text(
+        "Автомат 16А,1234.56\nКабель,100\n",
+        encoding="utf-8",
+    )
+    rows = catalogs.read_catalog_rows(path)
+    assert rows == [
+        {
+            "name": "Автомат 16А",
+            "price": 1234.56,
+            "source_file": "catalog.csv",
+            "sheet": None,
+            "row": 2,
+        },
+        {
+            "name": "Кабель",
+            "price": 100.0,
+            "source_file": "catalog.csv",
+            "sheet": None,
+            "row": 3,
+        },
+    ]
+@pytest.mark.parametrize(
+    "separator",
+    [
+        ";",
+        "\t",
+    ],
+)
+
+
+def test_read_csv_with_different_separators(tmp_path, separator):
+    path = tmp_path / "catalog.csv"
+    path.write_text(
+        f"Автомат{separator}1234.56\n",
+        encoding="utf-8",
+    )
+    rows = catalogs.read_catalog_rows(path)
+    assert rows[0]["name"] == "Автомат"
+    assert rows[0]["price"] == 1234.56
+
+
+def test_read_csv_supports_cyrillic(tmp_path):
+    path = tmp_path / "catalog.csv"
+    path.write_text(
+        "Выключатель;250\nРозетка;500\n",
+        encoding="utf-8",
+    )
+    rows = catalogs.read_catalog_rows(path)
+    assert [row["name"] for row in rows] == [
+        "Выключатель",
+        "Розетка",
+    ]
+
+
+def test_read_csv_skips_empty_rows(tmp_path):
+    path = tmp_path / "catalog.csv"
+
+    path.write_text(
+        "Автомат,100\n\n,200\nКабель,300\n",
+        encoding="utf-8",
+    )
+    rows = catalogs.read_catalog_rows(path)
+    assert [row["name"] for row in rows] == [
+        "Автомат",
+        "Кабель",
+    ]
+@pytest.mark.parametrize(
+    ("price", "expected"),
+    [
+        ("1234.56", 1234.56),
+        ("1 234,56", 1234.56),
+        ("1 234 руб.", 1234.0),
+    ],
+)
+
+
+def test_read_csv_price_formats(tmp_path, price, expected):
+    path = tmp_path / "catalog.csv"
+    path.write_text(
+        f'Товар,"{price}"\n',
+        encoding="utf-8",
+    )
+    rows = catalogs.read_catalog_rows(path)
+    assert rows[0]["price"] == expected
+
+
+def test_load_price_lists_includes_csv(tmp_path, monkeypatch):
+    monkeypatch.setattr(catalogs, "PRICE_LIST_DIR", tmp_path)
+    (tmp_path / "catalog.csv").write_text(
+        "Автомат,150\n",
+        encoding="utf-8",
+    )
+    rows = catalogs.load_price_lists()
+    assert rows == [
+        {
+            "name": "Автомат",
+            "price": 150.0,
+            "source_file": "catalog.csv",
+            "sheet": None,
+            "row": 2,
+        }
+    ]
