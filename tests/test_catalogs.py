@@ -37,9 +37,10 @@ def test_parse_price_ignores_bool():
 
 def test_sanitize_catalog_filename_accepts_safe_excel_names():
     assert catalogs.sanitize_catalog_filename("../Прайс лист.xlsx") == "Прайс_лист.xlsx"
+    assert catalogs.sanitize_catalog_filename("../Прайс лист.csv") == "Прайс_лист.csv"
 
 
-@pytest.mark.parametrize("filename", ["", "catalog.csv", "catalog.txt", ".."])
+@pytest.mark.parametrize("filename", ["", "catalog.txt", ".."])
 def test_sanitize_catalog_filename_rejects_invalid_names(filename):
     with pytest.raises(ValueError):
         catalogs.sanitize_catalog_filename(filename)
