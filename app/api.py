@@ -1,6 +1,9 @@
+from fileinput import filename
+from pathlib import Path
 import time
 from contextlib import asynccontextmanager
 
+from _pytest._py import path
 from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
@@ -8,14 +11,14 @@ from pydantic import BaseModel, Field
 from starlette.responses import Response
 
 import app.state as state
-from app.catalogs import list_catalog_files, save_catalog_upload
+from app.catalogs import list_catalog_files, save_catalog_upload, ALLOWED_CATALOG_SUFFIXES
 from app.config import (
     ALLOWED_HOSTS,
     ALLOWED_ORIGINS,
     ALLOWED_REFERER_ORIGINS,
     API_PREFIX,
     DISABLE_REQUEST_GUARD,
-    origin_from_url,
+    origin_from_url, PRICE_LIST_DIR,
 )
 from app.indexer import build_search_index, load_index_from_disk
 from app.search import find_similar_with_prices
@@ -227,3 +230,69 @@ async def import_xlsx(file: UploadFile = File(...)):
 @app.post("/export-xlsx")
 def export_xlsx(payload: dict = Body(...)):
     return export_univer_to_xlsx(payload)
+
+
+def validate_delete_catalog_request(filenames: list[str]) -> None:
+    if not filenames:
+        raise ValueError(f"Invalid filename")
+    for filename in filenames:
+        safe_name = Path(filename).name
+
+        if safe_name != filename:
+            raise ValueError(f"Invalid filename")
+        if Path(filename).suffix.lower() not in ALLOWED_CATALOG_SUFFIXES:
+            raise ValueError(f"Not supported file type")
+
+
+class CatalogDeleteItem(BaseModel):
+    filename: str
+    extension: str
+
+
+class DeleteCatalogsRequest(BaseModel):
+    files: list[CatalogDeleteItem]
+
+
+@app.post("/catalogs/delete-many")
+def delete_many_catalogs(req: DeleteCatalogsRequest):
+    try:
+        filenames = []
+        for item in req.files:
+            filename = item.filename
+            if not filename.endswith(f".{item.extension}"):
+                filename = f"{filename}.{item.extension}"
+            filenames.append(filename)
+        validate_delete_catalog_request(filenames)
+        deleted = delete_catalog_files(filenames)
+        state.mark_index_stale()
+        return {
+            "Status": "ok",
+            "deletedCount": len(deleted),
+            "deletedFiles": deleted,
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"File not found: {exc}"
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc)
+        )
+
+
+def delete_catalog_files(filenames: list[str]) -> list[str]:
+    PRICE_LIST_DIR.mkdir(parents=True, exist_ok=True)
+    deleted = []
+    for filename in filenames:
+        target = (PRICE_LIST_DIR / filename).resolve()
+        if not str(target).startswith(str(PRICE_LIST_DIR.resolve())):
+            raise ValueError(f"Path traversal detected: {filename}")
+        if not target.exists():
+            raise FileNotFoundError(filename)
+
+        target.unlink()
+        deleted.append(filename)
+
+    return deleted

@@ -274,3 +274,78 @@ def test_export_xlsx_delegates_to_exporter(monkeypatch, client):
     response = client.post("/export-xlsx", json={"sheets": []})
     assert response.status_code == 200
     assert response.json() == {"received": {"sheets": []}}
+
+
+def test_delete_catalog_success(monkeypatch, client, tmp_path):
+    catalog = tmp_path / "catalog.xlsx"
+    catalog.write_text("test")
+    monkeypatch.setattr(
+        api,
+        "PRICE_LIST_DIR",
+        tmp_path
+    )
+    state.INDEX_STALE = False
+    response = client.post(
+        "/catalogs/delete-many",
+        json={
+            "files": [
+                {
+                    "filename": "catalog",
+                    "extension": "xlsx"
+                }
+            ]
+        }
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "Status": "ok",
+        "deletedCount": 1,
+        "deletedFiles": [
+            "catalog.xlsx"
+        ]
+    }
+    assert not catalog.exists()
+    assert state.INDEX_STALE is True
+
+
+
+def test_delete_catalog_missing_file(monkeypatch, client, tmp_path):
+    monkeypatch.setattr(
+        api,
+        "PRICE_LIST_DIR",
+        tmp_path
+    )
+    response = client.post(
+        "/catalogs/delete-many",
+        json={
+            "files": [
+                {
+                    "filename": "missing",
+                    "extension": "xlsx"
+                }
+            ]
+        }
+    )
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "File not found: missing.xlsx"
+    }
+
+
+
+def test_delete_catalog_path_traversal(client):
+    response = client.post(
+        "/catalogs/delete-many",
+        json={
+            "files": [
+                {
+                    "filename": "../secret",
+                    "extension": "xlsx"
+                }
+            ]
+        }
+    )
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid filename"
+    }
