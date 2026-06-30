@@ -4,7 +4,7 @@ from typing import Any
 import torch
 
 import app.state as state
-from app.catalogs import load_price_lists
+from app.services.catalogs.catalogs import load_price_lists
 from app.config import DEFAULT_BATCH_SIZE, INDEX_DIR
 from app.model import encode_texts
 

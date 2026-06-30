@@ -6,16 +6,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
 from starlette.responses import Response
+from app.services.catalogs.catalogsDelete import DeleteCatalogsRequest
+from app.services.catalogs.deleteManyCatalogsService import  delete_many_catalogs_service
 
 import app.state as state
-from app.catalogs import list_catalog_files, save_catalog_upload
+from app.services.catalogs.catalogs import list_catalog_files, save_catalog_upload
 from app.config import (
     ALLOWED_HOSTS,
     ALLOWED_ORIGINS,
     ALLOWED_REFERER_ORIGINS,
     API_PREFIX,
     DISABLE_REQUEST_GUARD,
-    origin_from_url,
+    origin_from_url
 )
 from app.indexer import build_search_index, load_index_from_disk
 from app.search import find_similar_with_prices
@@ -227,3 +229,8 @@ async def import_xlsx(file: UploadFile = File(...)):
 @app.post("/export-xlsx")
 def export_xlsx(payload: dict = Body(...)):
     return export_univer_to_xlsx(payload)
+
+
+@app.post("/catalogs/delete-many")
+def delete_many_catalogs(req: DeleteCatalogsRequest):
+    return delete_many_catalogs_service(req)

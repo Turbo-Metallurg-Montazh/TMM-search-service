@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from fastapi import UploadFile
 
-import app.catalogs as catalogs
+import app.services.catalogs.catalogs as catalogs
 
 
 @pytest.mark.parametrize(
