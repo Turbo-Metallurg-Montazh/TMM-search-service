@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.services.catalogs import catalogsDelete
 
 import pytest
 from fastapi.testclient import TestClient
@@ -280,7 +281,7 @@ def test_delete_catalog_success(monkeypatch, client, tmp_path):
     catalog = tmp_path / "catalog.xlsx"
     catalog.write_text("test")
     monkeypatch.setattr(
-        api,
+        catalogsDelete,
         "PRICE_LIST_DIR",
         tmp_path
     )
@@ -311,7 +312,7 @@ def test_delete_catalog_success(monkeypatch, client, tmp_path):
 
 def test_delete_catalog_missing_file(monkeypatch, client, tmp_path):
     monkeypatch.setattr(
-        api,
+        catalogsDelete,
         "PRICE_LIST_DIR",
         tmp_path
     )
@@ -333,7 +334,15 @@ def test_delete_catalog_missing_file(monkeypatch, client, tmp_path):
 
 
 
-def test_delete_catalog_path_traversal(client):
+def test_delete_catalog_path_traversal(client, monkeypatch, tmp_path):
+    from app.services.catalogs import catalogsDelete
+
+    monkeypatch.setattr(
+        catalogsDelete,
+        "PRICE_LIST_DIR",
+        tmp_path
+    )
+
     response = client.post(
         "/catalogs/delete-many",
         json={
