@@ -1,7 +1,7 @@
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile, Depends # Добавили Depends
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
@@ -23,6 +23,7 @@ from app.indexer import build_search_index, load_index_from_disk
 from app.search import find_similar_with_prices
 from app.spreadsheet_io import export_univer_to_xlsx, import_xlsx_to_univer
 
+from app.dependencies.auth import VerifyScopes
 
 REQ = Counter("http_requests_total", "Total HTTP requests", ["method", "path", "status"])
 LAT = Histogram("http_request_duration_seconds", "Request latency", ["path"])
@@ -107,6 +108,7 @@ async def metrics_mw(request, call_next):
     return resp
 
 
+# Публичные эндпоинты
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -117,7 +119,8 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.post("/build-index")
+# Защищенные эндпоинты
+@app.post("/build-index", dependencies=[Depends(VerifyScopes(["catalogs:write"]))])
 def build_index(req: BuildIndexRequest | None = None):
     batch_size = req.batch_size if req else 16
     try:
@@ -127,7 +130,7 @@ def build_index(req: BuildIndexRequest | None = None):
     return {"status": "ok", "index": info}
 
 
-@app.get("/index-status")
+@app.get("/index-status", dependencies=[Depends(VerifyScopes(["catalogs:read"]))])
 def index_status():
     return {
         "ready": state.INDEX_READY,
@@ -137,7 +140,7 @@ def index_status():
     }
 
 
-@app.post("/suggest", response_model=list[Suggestion])
+@app.post("/suggest", response_model=list[Suggestion], dependencies=[Depends(VerifyScopes(["catalogs:read"]))])
 def suggest(query: str = Body(..., min_length=1, description="Tender item text to match against supplier catalogs")):
     if not state.INDEX_READY:
         raise HTTPException(status_code=503, detail="Index not built")
@@ -160,12 +163,12 @@ def suggest(query: str = Body(..., min_length=1, description="Tender item text t
     ]
 
 
-@app.get("/catalogs")
+@app.get("/catalogs", dependencies=[Depends(VerifyScopes(["catalogs:read"]))])
 def catalogs():
     return {"catalogs": list_catalog_files()}
 
 
-@app.post("/catalogs/upload")
+@app.post("/catalogs/upload", dependencies=[Depends(VerifyScopes(["catalogs:write"]))])
 async def upload_catalog(
     file: UploadFile = File(...),
     rebuild_index: bool = Query(default=False),
@@ -192,7 +195,7 @@ async def upload_catalog(
     }
 
 
-@app.post("/catalogs/upload-many")
+@app.post("/catalogs/upload-many", dependencies=[Depends(VerifyScopes(["catalogs:write"]))])
 async def upload_many_catalogs(
     files: list[UploadFile] = File(...),
     rebuild_index: bool = Query(default=False),
@@ -221,16 +224,16 @@ async def upload_many_catalogs(
     }
 
 
-@app.post("/import-xlsx")
+@app.post("/import-xlsx", dependencies=[Depends(VerifyScopes(["catalogs:write"]))])
 async def import_xlsx(file: UploadFile = File(...)):
     return await import_xlsx_to_univer(file)
 
 
-@app.post("/export-xlsx")
+@app.post("/export-xlsx", dependencies=[Depends(VerifyScopes(["catalogs:read"]))])
 def export_xlsx(payload: dict = Body(...)):
     return export_univer_to_xlsx(payload)
 
 
-@app.post("/catalogs/delete-many")
+@app.post("/catalogs/delete-many", dependencies=[Depends(VerifyScopes(["catalogs:write"]))])
 def delete_many_catalogs(req: DeleteCatalogsRequest):
     return delete_many_catalogs_service(req)
