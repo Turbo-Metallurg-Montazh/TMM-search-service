@@ -8,7 +8,7 @@ import app.state as state
 from main import app as main_app
 from app.services.catalogs import catalogsDelete
 from app.dependencies.auth import JWTBearer, VerifyScopes
-
+from app.dependencies.auth import jwt_bearer, VerifyScopes
 
 # ==============================================================================
 # ФИКСТУРЫ
@@ -388,30 +388,34 @@ def test_delete_catalog_path_traversal(client, monkeypatch, tmp_path):
 def test_jwt_bearer_missing_credentials(clean_client):
     """Проверяет, что защищенный эндпоинт отклоняет запросы без токена."""
     response = clean_client.get("/catalogs")
-    # Так как используется нативный HTTPBearer, FastAPI возвращает 403 "Not authenticated"
-    assert response.status_code in (401, 403)
+    assert response.status_code == 401
+    # Меняем на то, что реально возвращает FastAPI
+    assert "Not authenticated" in response.json()["detail"]
 
 
 def test_jwt_bearer_invalid_scheme(clean_client):
     """Проверяет отклонение схем авторизации, отличных от Bearer."""
     headers = {"Authorization": "Basic bG9naW46cGFzc3dvcmQ="}
     response = clean_client.get("/catalogs", headers=headers)
-    assert response.status_code in (401, 403)
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json()["detail"]
 
 
-def test_verify_scopes_insufficient_permissions(monkeypatch, clean_client):
+def test_verify_scopes_insufficient_permissions(clean_client):
     """Проверяет работу фабрики VerifyScopes при нехватке прав."""
-    # Симулируем токен, у которого есть только права на чтение
     fake_read_only_payload = {
         "sub": "reader_user",
         "scopes": ["catalogs:read"]
     }
 
-    # Подменяем валидацию самого токена, возвращая урезанный payload
-    monkeypatch.setattr(JWTBearer, "__call__", lambda self, credentials=None: fake_read_only_payload)
+    for app_instance in [main_app, api.app]:
+        app_instance.dependency_overrides[jwt_bearer] = lambda: fake_read_only_payload
 
-    # Пытаемся стучаться на эндпоинт создания индекса, требующий "catalogs:write"
-    response = clean_client.post("/build-index", json={"batch_size": 16})
+    try:
+        response = clean_client.post("/build-index", json={"batch_size": 16})
 
-    assert response.status_code == 403
-    assert "Insufficient permissions" in response.json()["detail"]
+        assert response.status_code == 403
+        assert "Insufficient permissions" in response.json()["detail"]
+    finally:
+        main_app.dependency_overrides.clear()
+        api.app.dependency_overrides.clear()
