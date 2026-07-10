@@ -1,6 +1,4 @@
 from __future__ import annotations
-from app.services.catalogs import catalogsDelete
-
 import pytest
 from fastapi.testclient import TestClient
 from starlette.responses import JSONResponse
@@ -8,21 +6,32 @@ from starlette.responses import JSONResponse
 import app.api as api
 import app.state as state
 from main import app as main_app
-
+from app.services.catalogs import catalogsDelete
 from app.dependencies.auth import JWTBearer, VerifyScopes
+
+
+# ==============================================================================
+# ФИКСТУРЫ
+# ==============================================================================
 
 @pytest.fixture
 def client(monkeypatch):
+    """
+    Клиент со сквозной авторизацией (mock).
+    Используется для тестирования основной бизнес-логики эндпоинтов.
+    """
     monkeypatch.setattr(api, "load_index_from_disk", lambda: False)
 
     fake_token_payload = {
         "sub": "test_user",
-        "scopes": ["admin", "read", "write", "catalogs:write"]
+        "scopes": ["admin", "read", "write", "catalogs:write", "catalogs:read"]
     }
 
+    # Подменяем вызовы декораторов
     monkeypatch.setattr(JWTBearer, "__call__", lambda self, credentials=None: fake_token_payload)
     monkeypatch.setattr(VerifyScopes, "__call__", lambda self, payload=None: fake_token_payload)
 
+    # Переопределяем зависимости в FastAPI
     for app_instance in [main_app, api.app]:
         app_instance.dependency_overrides[JWTBearer] = lambda: fake_token_payload
         app_instance.dependency_overrides[VerifyScopes] = lambda: fake_token_payload
@@ -35,6 +44,20 @@ def client(monkeypatch):
     main_app.dependency_overrides.clear()
     api.app.dependency_overrides.clear()
 
+
+@pytest.fixture
+def clean_client():
+    """
+    Чистый клиент БЕЗ подмены авторизации.
+    Используется исключительно для тестирования middleware, JWTBearer и VerifyScopes.
+    """
+    with TestClient(main_app) as test_client:
+        yield test_client
+
+
+# ==============================================================================
+# ТЕСТЫ СТРУКТУРЫ И MIDDLEWARE (ОБЩИЕ)
+# ==============================================================================
 
 def test_main_exports_fastapi_app():
     assert main_app is api.app
@@ -71,7 +94,6 @@ def test_request_guard_can_be_disabled_for_local_clients(monkeypatch, client):
     monkeypatch.setattr(api, "list_catalog_files", lambda: [])
 
     response = client.get("/catalogs", headers={"host": "evil.example"})
-
     assert response.status_code == 200
     assert response.json() == {"catalogs": []}
 
@@ -87,6 +109,10 @@ def test_origin_guard_rejects_forbidden_referer(client):
     assert response.status_code == 403
     assert response.text == "Forbidden referer"
 
+
+# ==============================================================================
+# ТЕСТЫ ЭНДПОИНТОВ И ИХ ВАЛИДАЦИИ
+# ==============================================================================
 
 def test_index_status_returns_runtime_state(monkeypatch, client):
     monkeypatch.setattr(api, "list_catalog_files", lambda: [{"filename": "catalog.xlsx"}])
@@ -110,8 +136,10 @@ def test_build_index_uses_default_request(monkeypatch, client):
     assert calls == [16]
 
 
-def test_build_index_validates_batch_size(client):
-    response = client.post("/build-index", json={"batch_size": 0})
+@pytest.mark.parametrize("batch_size", [0, 257])
+def test_build_index_validates_batch_size_boundaries(client, batch_size):
+    """Проверяет ограничения ge=1 и le=256 для схемы Pydantic."""
+    response = client.post("/build-index", json={"batch_size": batch_size})
     assert response.status_code == 422
 
 
@@ -137,6 +165,13 @@ def test_suggest_returns_empty_for_blank_query(client):
     response = client.post("/suggest", json="   ")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_suggest_requires_min_length_validation(client):
+    """Проверяет валидацию min_length=1 на уровне FastAPI Body."""
+    state.INDEX_READY = True
+    response = client.post("/suggest", json="")
+    assert response.status_code == 422
 
 
 def test_suggest_maps_search_results(monkeypatch, client):
@@ -176,6 +211,17 @@ def test_catalogs_returns_file_list(monkeypatch, client):
     response = client.get("/catalogs")
     assert response.status_code == 200
     assert response.json() == {"catalogs": [{"filename": "catalog.xlsx"}]}
+
+
+# --- ТЕСТЫ ЗАГРУЗКИ / УДАЛЕНИЯ КАТАЛОГОВ ---
+
+@pytest.mark.parametrize("endpoint", ["/catalogs/upload", "/catalogs/upload-many"])
+@pytest.mark.parametrize("batch_size", [0, 257])
+def test_upload_endpoints_validate_batch_size_query(client, endpoint, batch_size):
+    """Проверяет валидацию Query параметров ge=1 и le=256 при загрузке."""
+    files = {"file": ("a.xlsx", b"data")} if endpoint == "/catalogs/upload" else [("files", ("a.xlsx", b"data"))]
+    response = client.post(f"{endpoint}?batch_size={batch_size}", files=files)
+    assert response.status_code == 422
 
 
 def test_upload_catalog_without_rebuild_marks_index_stale(monkeypatch, client):
@@ -297,81 +343,75 @@ def test_export_xlsx_delegates_to_exporter(monkeypatch, client):
 def test_delete_catalog_success(monkeypatch, client, tmp_path):
     catalog = tmp_path / "catalog.xlsx"
     catalog.write_text("test")
-    monkeypatch.setattr(
-        catalogsDelete,
-        "PRICE_LIST_DIR",
-        tmp_path
-    )
+    monkeypatch.setattr(catalogsDelete, "PRICE_LIST_DIR", tmp_path)
     state.INDEX_STALE = False
+
     response = client.post(
         "/catalogs/delete-many",
-        json={
-            "files": [
-                {
-                    "filename": "catalog",
-                    "extension": "xlsx"
-                }
-            ]
-        }
+        json={"files": [{"filename": "catalog", "extension": "xlsx"}]}
     )
     assert response.status_code == 200
     assert response.json() == {
         "Status": "ok",
         "deletedCount": 1,
-        "deletedFiles": [
-            "catalog.xlsx"
-        ]
+        "deletedFiles": ["catalog.xlsx"]
     }
     assert not catalog.exists()
     assert state.INDEX_STALE is True
 
 
-
 def test_delete_catalog_missing_file(monkeypatch, client, tmp_path):
-    monkeypatch.setattr(
-        catalogsDelete,
-        "PRICE_LIST_DIR",
-        tmp_path
-    )
+    monkeypatch.setattr(catalogsDelete, "PRICE_LIST_DIR", tmp_path)
     response = client.post(
         "/catalogs/delete-many",
-        json={
-            "files": [
-                {
-                    "filename": "missing",
-                    "extension": "xlsx"
-                }
-            ]
-        }
+        json={"files": [{"filename": "missing", "extension": "xlsx"}]}
     )
     assert response.status_code == 404
-    assert response.json() == {
-        "detail": "File not found: missing.xlsx"
-    }
-
+    assert response.json() == {"detail": "File not found: missing.xlsx"}
 
 
 def test_delete_catalog_path_traversal(client, monkeypatch, tmp_path):
-    from app.services.catalogs import catalogsDelete
-
-    monkeypatch.setattr(
-        catalogsDelete,
-        "PRICE_LIST_DIR",
-        tmp_path
-    )
+    monkeypatch.setattr(catalogsDelete, "PRICE_LIST_DIR", tmp_path)
 
     response = client.post(
         "/catalogs/delete-many",
-        json={
-            "files": [
-                {
-                    "filename": "../secret",
-                    "extension": "xlsx"
-                }
-            ]
-        }
+        json={"files": [{"filename": "../secret", "extension": "xlsx"}]}
     )
     assert response.status_code == 400
-    assert response.json() == {
-        "detail": "Invalid filename"
+    assert response.json() == {"detail": "Invalid filename"}
+
+
+# ==============================================================================
+# ТЕСТЫ БЕЗОПАСНОСТИ (JWT BEARER & SCOPES)
+# ==============================================================================
+
+def test_jwt_bearer_missing_credentials(clean_client):
+    """Проверяет, что защищенный эндпоинт отклоняет запросы без токена."""
+    response = clean_client.get("/catalogs")
+    # Так как используется нативный HTTPBearer, FastAPI возвращает 403 "Not authenticated"
+    assert response.status_code in (401, 403)
+
+
+def test_jwt_bearer_invalid_scheme(clean_client):
+    """Проверяет отклонение схем авторизации, отличных от Bearer."""
+    headers = {"Authorization": "Basic bG9naW46cGFzc3dvcmQ="}
+    response = clean_client.get("/catalogs", headers=headers)
+    assert response.status_code in (401, 403)
+
+
+def test_verify_scopes_insufficient_permissions(monkeypatch, clean_client):
+    """Проверяет работу фабрики VerifyScopes при нехватке прав."""
+    # Симулируем токен, у которого есть только права на чтение
+    fake_read_only_payload = {
+        "sub": "reader_user",
+        "scopes": ["catalogs:read"]
     }
+
+    # Подменяем валидацию самого токена, возвращая урезанный payload
+    monkeypatch.setattr(JWTBearer, "__call__", lambda self, credentials=None: fake_read_only_payload)
+
+    # Пытаемся стучаться на эндпоинт создания индекса, требующий "catalogs:write"
+    response = clean_client.post("/build-index", json={"batch_size": 16})
+
+    assert response.status_code == 403
+    assert "Insufficient permissions" in response.json()["detail"]
