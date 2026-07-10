@@ -9,14 +9,31 @@ import app.api as api
 import app.state as state
 from main import app as main_app
 
+from app.dependencies.auth import JWTBearer, VerifyScopes
 
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(api, "load_index_from_disk", lambda: False)
-    with TestClient(api.app) as test_client:
+
+    fake_token_payload = {
+        "sub": "test_user",
+        "scopes": ["admin", "read", "write", "catalogs:write"]
+    }
+
+    monkeypatch.setattr(JWTBearer, "__call__", lambda self, credentials=None: fake_token_payload)
+    monkeypatch.setattr(VerifyScopes, "__call__", lambda self, payload=None: fake_token_payload)
+
+    for app_instance in [main_app, api.app]:
+        app_instance.dependency_overrides[JWTBearer] = lambda: fake_token_payload
+        app_instance.dependency_overrides[VerifyScopes] = lambda: fake_token_payload
+
+    with TestClient(main_app) as test_client:
         state.reset_index()
         yield test_client
         state.reset_index()
+
+    main_app.dependency_overrides.clear()
+    api.app.dependency_overrides.clear()
 
 
 def test_main_exports_fastapi_app():
