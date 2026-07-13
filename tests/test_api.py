@@ -46,11 +46,12 @@ def client(monkeypatch):
 
 
 @pytest.fixture
-def clean_client():
+def clean_client(monkeypatch):
     """
     Чистый клиент БЕЗ подмены авторизации.
     Используется исключительно для тестирования middleware, JWTBearer и VerifyScopes.
     """
+    monkeypatch.setattr(api, "load_index_from_disk", lambda: False)
     with TestClient(main_app) as test_client:
         yield test_client
 
@@ -389,7 +390,6 @@ def test_jwt_bearer_missing_credentials(clean_client):
     """Проверяет, что защищенный эндпоинт отклоняет запросы без токена."""
     response = clean_client.get("/catalogs")
     assert response.status_code == 401
-    # Меняем на то, что реально возвращает FastAPI
     assert "Not authenticated" in response.json()["detail"]
 
 
