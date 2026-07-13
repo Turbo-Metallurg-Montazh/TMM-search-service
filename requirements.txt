@@ -16,3 +16,4 @@ xlrd
 pytest
 pytest-cov
 httpx
+pyjwt
