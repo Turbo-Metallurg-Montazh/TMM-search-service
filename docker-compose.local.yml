@@ -9,6 +9,16 @@ services:
       INDEX_DIR: /data/index_data
       PRICE_LIST_DIR: /data/price_lists
       DISABLE_REQUEST_GUARD: "true"
+      JWT_PUBLIC_KEY: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmkwbWMcIIsVsYSJut+1Y
+        4EeI7vjI/It9BbiWsNhJVRQqSPeddDRa6lWIVuU3tmiylecyb5a+DGXaR6u/7OeG
+        s51ppjAtOa1AglIHGkYyVhGU2vAVPeIOeporbD+qaTefljyM+cQ2hLhtbjXfgkK2
+        fSRDa2ODVLLd6Vj3pkfngv3Qd794Fb1rPnmWm30XEszYbUxKSNQxlVM705bp7Dez
+        neCxFssCzbd4G6Sl0YaFD+617KQrL0Pi/G5zt3q6obMwLQtERRq9ekwA3bBHOkBi
+        Phyx53mKKCp0Pe3OBRPGGJfkyu/CQO5vt/zWCE7xx0o4luRRJ+fNuNeAtPXjUkbV
+        ewIDAQAB
+        -----END PUBLIC KEY-----
     ports:
       - "8000:8000"
     volumes:

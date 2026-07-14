@@ -2,11 +2,7 @@ import jwt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-try:
-    from app.config import JWT_PUBLIC_KEY
-except ImportError:
-    import os
-    JWT_PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "your-default-public-key-here")
+from app.config import JWT_PUBLIC_KEY
 
 class JWTBearer(HTTPBearer):
     def __init__(self, auto_error: bool = True):
