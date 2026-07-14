@@ -53,6 +53,11 @@ spec:
               value: https://search.turbo-metallurg-montazh.ru
             - name: ALLOWED_HOSTS
               value: search.turbo-metallurg-montazh.ru,emk-search-service,emk-search-service.search-service.svc,emk-search-service.search-service.svc.cluster.local
+            - name: JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: search-service-secrets
+                  key: jwt-public-key
           ports:
             - containerPort: 8000
               protocol: TCP

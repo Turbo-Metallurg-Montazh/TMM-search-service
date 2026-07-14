@@ -23,6 +23,8 @@ ALLOWED_ORIGINS = _parse_csv(os.getenv("ALLOWED_ORIGINS", "https://api.turbo-met
 ALLOWED_REFERER_ORIGINS = set(ALLOWED_ORIGINS)
 ALLOWED_HOSTS = _parse_csv(os.getenv("ALLOWED_HOSTS", "api.turbo-metallurg-montazh.ru,emk-search-service,emk-search-service.backend.svc,localhost,127.0.0.1,testserver"))
 
+JWT_PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "")
+
 
 def origin_from_url(value: str) -> str | None:
     parsed = urlparse(value)
